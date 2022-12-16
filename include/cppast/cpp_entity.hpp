@@ -154,6 +154,8 @@ public:
     /// \effects Creates it giving it the the name.
     cpp_entity(std::string name) : name_(std::move(name)), user_data_(nullptr) {}
 
+    int linenum = -1;
+
 private:
     /// \returns The kind of the entity.
     virtual cpp_entity_kind do_get_entity_kind() const noexcept = 0;

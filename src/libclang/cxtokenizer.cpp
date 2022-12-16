@@ -111,12 +111,16 @@ CXSourceLocation get_next_location_impl(const CXTranslationUnit& tu, CXFile file
     DEBUG_ASSERT(clang_Location_isFromMainFile(loc), detail::assert_handler{});
 
     unsigned offset;
-    clang_getSpellingLocation(loc, nullptr, nullptr, nullptr, &offset);
+    unsigned line;
+    unsigned column;
+    CXString oldFilename = clang_getFileName( file );
+    clang_getSpellingLocation(loc, NULL, &line, &column, &offset);
     if (inc >= 0)
         offset += unsigned(inc);
     else
         offset -= unsigned(-inc);
-    return clang_getLocationForOffset(tu, file, offset);
+    CXSourceLocation res = clang_getLocationForOffset(tu, file, offset);
+    return res;
 }
 
 CXSourceLocation get_next_location(const CXTranslationUnit& tu, const CXFile& file,
@@ -129,8 +133,7 @@ CXSourceLocation get_next_location(const CXTranslationUnit& tu, const CXFile& fi
 CXSourceLocation get_prev_location(const CXTranslationUnit& tu, const CXFile& file,
                                    const CXSourceLocation& loc, std::size_t token_length)
 {
-    auto inc = 1;
-    while (true)
+    for ( int inc = 1; ; inc++ )
     {
         auto loc_before = get_next_location_impl(tu, file, loc, -inc);
         DEBUG_ASSERT(!clang_equalLocations(loc_before, loc), detail::assert_handler{});
@@ -141,6 +144,9 @@ CXSourceLocation get_prev_location(const CXTranslationUnit& tu, const CXFile& fi
 
         simple_tokenizer tokenizer(tu, clang_getRange(loc_before, loc));
 
+        if ( tokenizer.size() == 0 )
+            continue;
+
         auto token_location = clang_getTokenLocation(tu, tokenizer[0]);
         if (clang_equalLocations(loc_before, token_location))
         {
@@ -149,8 +155,6 @@ CXSourceLocation get_prev_location(const CXTranslationUnit& tu, const CXFile& fi
             // need to move by token_length - 1 to get to the first character
             return get_next_location_impl(tu, file, loc, -1 * (inc + int(token_length) - 1));
         }
-        else
-            ++inc;
     }
 
     return clang_getNullLocation();
@@ -419,6 +423,15 @@ void detail::skip(detail::cxtoken_stream& stream, const char* str)
     if (*str)
     {
         // non-empty string
+        auto loc = clang_getCursorLocation( stream.cursor() );
+
+        CXFile file;
+        unsigned line;
+        unsigned column;
+        clang_getSpellingLocation(loc, &file, &line, &column, NULL);
+        CXString filename = clang_getFileName( file );
+        const char* filenameStr = clang_getCString( filename );
+
         DEBUG_ASSERT(!stream.done(), parse_error_handler{}, stream.cursor(),
                      format("expected '", str, "', got exhausted stream"));
         auto& token = stream.peek();

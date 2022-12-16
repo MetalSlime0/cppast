@@ -209,7 +209,7 @@ try
         detail::cxtokenizer    tokenizer(context.tu, context.file, cur);
         detail::cxtoken_stream stream(tokenizer, cur);
         auto                   spelling = detail::to_string(stream, stream.end());
-        if (spelling.begin() + 1 == spelling.end() && spelling.front().spelling == ";")
+        if ( !spelling.empty() && spelling.begin() + 1 == spelling.end() && spelling.front().spelling == ";")
             // unnecessary semicolon
             return nullptr;
 

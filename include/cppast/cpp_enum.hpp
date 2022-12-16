@@ -83,7 +83,7 @@ public:
         /// \returns The finished enum.
         std::unique_ptr<cpp_enum> finish(
             const cpp_entity_index& idx, cpp_entity_id id,
-            type_safe::optional<cpp_entity_ref> semantic_parent) noexcept
+            type_safe::optional<cpp_entity_ref> semantic_parent)
         {
             enum_->set_semantic_parent(std::move(semantic_parent));
             idx.register_definition(std::move(id), type_safe::ref(*enum_));

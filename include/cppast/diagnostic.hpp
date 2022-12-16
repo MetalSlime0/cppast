@@ -49,9 +49,9 @@ struct source_location
     }
 
     /// \returns A source location where entity and file name is available.
-    static source_location make_entity(std::string entity, std::string file)
+    static source_location make_entity(std::string entity, std::string file, int line)
     {
-        return {std::move(entity), std::move(file), type_safe::nullopt, type_safe::nullopt};
+        return {std::move(entity), std::move(file), line, type_safe::nullopt};
     }
 
     /// \returns A possible string representation of the source location.

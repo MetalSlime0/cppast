@@ -71,11 +71,17 @@ std::unique_ptr<cpp_entity> detail::parse_cpp_namespace(const detail::parse_cont
     else
         context.comments.match(builder.get(), cur);
 
-    detail::visit_children(cur, [&](const CXCursor& cur) {
+    auto cb = [&](const CXCursor& cur) {
         auto entity = parse_entity(context, &builder.get(), cur);
         if (entity)
             builder.add_child(std::move(entity));
-    });
+    };
+
+    if ( context.keepEntitiesInIncludes )
+        detail::visit_children( cur, cb );
+    else
+        detail::visit_children_checkfile( cur, context.path, cb );
+
     return builder.finish(*context.idx, get_entity_id(cur));
 }
 

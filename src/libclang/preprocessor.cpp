@@ -996,7 +996,7 @@ struct linemarker
     bool is_system = false;
 };
 
-ts::optional<linemarker> parse_linemarker(position& p)
+ts::optional<linemarker> skip_linemarker(position& p)
 {
     // format (at new line): # <line> "<filename>" <flags>
     // flag 1: enter_new
@@ -1063,6 +1063,74 @@ ts::optional<linemarker> parse_linemarker(position& p)
 
     return result;
 }
+
+ts::optional<linemarker> parse_linemarker(position& p)
+{
+    // format (at new line): # <line> "<filename>" <flags>
+    // flag 1: enter_new
+    // flag 2: enter_old
+    // flag 3: system file
+    // flag 4: ignored
+    if (!p.was_newl() || !starts_with(p, "#"))
+        return ts::nullopt;
+    p.bump();
+    DEBUG_ASSERT(!starts_with(p, "define") && !starts_with(p, "undef") && !starts_with(p, "pragma"),
+                 detail::assert_handler{}, "handle macros first");
+
+    linemarker result;
+
+    std::string line;
+    for (bump_spaces(p, true); std::isdigit(*p.ptr()); p.bump())
+        line += *p.ptr();
+    result.line = unsigned(std::stoi(line));
+
+    bump_spaces(p, true);
+    DEBUG_ASSERT(*p.ptr() == '"', detail::assert_handler{});
+    p.bump();
+
+    std::string file_name;
+    for (; !starts_with(p, "\""); p.bump())
+    {
+        if ( starts_with( p, "\\\\" ) )
+        {
+            file_name += "\\";
+            p.bump();
+        }
+        else
+            file_name += *p.ptr();
+    }
+    p.bump();
+    result.file = std::move(file_name);
+
+    for (; !starts_with(p, "\n"); p.bump())
+    {
+        bump_spaces(p, true);
+
+        switch (*p.ptr())
+        {
+        case '1':
+            DEBUG_ASSERT(result.flag == linemarker::line_directive, detail::assert_handler{});
+            result.flag = linemarker::enter_new;
+            break;
+        case '2':
+            DEBUG_ASSERT(result.flag == linemarker::line_directive, detail::assert_handler{});
+            result.flag = linemarker::enter_old;
+            break;
+        case '3':
+            result.is_system = true;
+            break;
+        case '4':
+            break; // ignored
+
+        default:
+            DEBUG_UNREACHABLE(detail::assert_handler{}, "invalid line marker");
+            break;
+        }
+    }
+    p.bump();
+
+    return result;
+}
 } // namespace
 
 detail::preprocessor_output detail::preprocess(const libclang_compile_config& config,
@@ -1070,6 +1138,8 @@ detail::preprocessor_output detail::preprocess(const libclang_compile_config& co
 {
     detail::preprocessor_output                  result;
     std::unordered_map<std::string, std::string> indirect_includes;
+
+    bool keepIncludedFileContents = detail::libclang_compile_config_access::keepEntitiesInIncludes(config);
 
     auto preprocessed = clang_preprocess(config, path, logger);
 
@@ -1120,7 +1190,7 @@ detail::preprocessor_output detail::preprocess(const libclang_compile_config& co
         }
         else if (auto undef = parse_undef(p))
         {
-            if (p.write_enabled())
+            if (p.write_enabled() && !keepIncludedFileContents)
             {
                 if (logger.is_verbose())
                     logger.log("preprocessor",
@@ -1135,9 +1205,15 @@ detail::preprocessor_output detail::preprocess(const libclang_compile_config& co
                                     result.macros.end());
             }
         }
+        else if ( keepIncludedFileContents && p.was_newl() && starts_with(p, "#include") )
+        {
+            // since the included file's contents are included, skip the actual #include line
+            while ( p.ptr()[0] != '\n' )
+                p.skip();
+        }
         else if (auto include = parse_include(p))
         {
-            if (p.write_enabled())
+            if (p.write_enabled() )
             {
                 if (logger.is_verbose())
                     logger.log("preprocessor",
@@ -1151,11 +1227,11 @@ detail::preprocessor_output detail::preprocess(const libclang_compile_config& co
         }
         else if (bump_pragma(p))
             continue;
-        else if (auto lm = parse_linemarker(p))
+        else if (auto lm = keepIncludedFileContents ? parse_linemarker(p) : skip_linemarker(p))
         {
             if (lm.value().flag == linemarker::enter_new)
             {
-                if (p.write_enabled())
+                if (p.write_enabled() && !keepIncludedFileContents)
                 {
                     // this is a direct include, update the full path of the last include
                     // note: path can be empty if pre clang 4 and not fast preprocessing
@@ -1168,6 +1244,7 @@ detail::preprocessor_output detail::preprocess(const libclang_compile_config& co
                                      detail::assert_handler{});
                         result.includes.back().full_path = lm.value().file;
                     }
+                    p.disable_write();
                 }
                 else
                 {
@@ -1183,7 +1260,6 @@ detail::preprocessor_output detail::preprocess(const libclang_compile_config& co
                     indirect_includes.emplace(std::move(file_name), full_path);
                 }
 
-                p.disable_write();
             }
             else if (lm.value().flag == linemarker::enter_old)
             {

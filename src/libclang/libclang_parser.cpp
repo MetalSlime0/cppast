@@ -6,6 +6,7 @@
 #include <cstring>
 #include <fstream>
 #include <vector>
+#include <assert.h>
 
 #include <clang-c/CXCompilationDatabase.h>
 #include <process.hpp>
@@ -48,6 +49,12 @@ bool detail::libclang_compile_config_access::remove_comments_in_macro(
     const libclang_compile_config& config)
 {
     return config.remove_comments_in_macro_;
+}
+
+bool detail::libclang_compile_config_access::keepEntitiesInIncludes(
+    const libclang_compile_config& config)
+{
+    return config.keepEntitiesInIncludes;
 }
 
 libclang_compilation_database::libclang_compilation_database(const std::string& build_directory)
@@ -604,7 +611,7 @@ try
     auto preprocessed = detail::preprocess(config, path.c_str(), logger());
     if (detail::libclang_compile_config_access::write_preprocessed(config))
     {
-        std::ofstream file(path + ".pp");
+        std::ofstream file("pp.pp");
         file << preprocessed.source;
     }
 
@@ -619,15 +626,19 @@ try
     // convert entity hierarchies
     detail::parse_context context{tu.get(),
                                   file,
+                                  path,
                                   type_safe::ref(logger()),
                                   type_safe::ref(idx),
                                   detail::comment_context(preprocessed.comments),
-                                  false};
-    detail::visit_tu(tu, path.c_str(), [&](const CXCursor& cur) {
+                                  false,
+                                  detail::libclang_compile_config_access::keepEntitiesInIncludes(config)};
+    
+    auto cb = [&](const CXCursor& cur) {
         if (clang_getCursorKind(cur) == CXCursor_InclusionDirective)
         {
-            if (!preprocessed.includes.empty())
+            if ( !preprocessed.includes.empty() )
             {
+                assert( include_iter != preprocessed.includes.end() );
                 DEBUG_ASSERT(include_iter != preprocessed.includes.end()
                                  && get_line_no(cur) >= include_iter->line,
                              detail::assert_handler{});
@@ -665,11 +676,22 @@ try
                  macro_iter != preprocessed.macros.end() && macro_iter->line <= line; ++macro_iter)
                 builder.add_child(std::move(macro_iter->macro));
 
+            /*auto loc = clang_getCursorLocation( cur );
+            //CXString filename;
+            unsigned int line;
+            clang_getFileLocation( loc, NULL, &line, nullptr, nullptr ); // clang_getPresumedLocation
+            //const char* filenameStr = clang_getCString( filename );*/
+
             auto entity = detail::parse_entity(context, &builder.get(), cur);
             if (entity)
                 builder.add_child(std::move(entity));
         }
-    });
+    };
+
+    if ( detail::libclang_compile_config_access::keepEntitiesInIncludes(config) )
+        detail::visit_children( clang_getTranslationUnitCursor(tu.get()), cb );
+    else
+        detail::visit_children_checkfile( clang_getTranslationUnitCursor(tu.get()), path, cb );
 
     for (; macro_iter != preprocessed.macros.end(); ++macro_iter)
         builder.add_child(std::move(macro_iter->macro));

@@ -1,0 +1,9 @@
+[submodule "type_safe"]
+	path = type_safe
+	url = https://github.com/foonathan/type_safe
+[submodule "debug_assert"]
+	path = debug_assert
+	url = https://github.com/foonathan/debug_assert
+[submodule "tiny-process-library"]
+	path = tiny-process-library
+	url = https://gitlab.com/eidheim/tiny-process-library

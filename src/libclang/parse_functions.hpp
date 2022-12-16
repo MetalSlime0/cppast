@@ -51,10 +51,12 @@ namespace detail
     {
         CXTranslationUnit                              tu;
         CXFile                                         file;
+        std::string                                    path;
         type_safe::object_ref<const diagnostic_logger> logger;
         type_safe::object_ref<const cpp_entity_index>  idx;
         comment_context                                comments;
         mutable bool                                   error;
+        bool                                           keepEntitiesInIncludes;
     };
 
     // parse default value of variable, function parameter...

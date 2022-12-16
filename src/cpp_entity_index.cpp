@@ -10,8 +10,8 @@
 
 using namespace cppast;
 
-cpp_entity_index::duplicate_definition_error::duplicate_definition_error()
-: std::logic_error("duplicate registration of entity definition")
+cpp_entity_index::duplicate_definition_error::duplicate_definition_error( const std::string& name )
+: std::logic_error( "duplicate registration of entity definition" )
 {}
 
 void cpp_entity_index::register_definition(cpp_entity_id                           id,
@@ -28,7 +28,7 @@ void cpp_entity_index::register_definition(cpp_entity_id                        
         if (value.is_definition && !is_template(value.entity->kind()))
             // allow duplicate definition of templates
             // this handles things such as SFINAE
-            throw duplicate_definition_error();
+            throw duplicate_definition_error( entity->name() );
         value.is_definition = true;
         value.entity        = entity;
     }

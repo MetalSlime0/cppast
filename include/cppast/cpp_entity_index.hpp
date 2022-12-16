@@ -62,7 +62,7 @@ public:
     class duplicate_definition_error : public std::logic_error
     {
     public:
-        duplicate_definition_error();
+        duplicate_definition_error( const std::string& name );
     };
 
     /// \effects Registers a new [cppast::cpp_entity]() which is a definition.

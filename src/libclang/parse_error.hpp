@@ -26,10 +26,16 @@ namespace detail
         return source_location::make_file(cxstring(file).c_str(), line);
     }
 
-    inline source_location make_location(const CXFile& file, const CXCursor& cur)
+    inline source_location make_location(const CXFile& file_ignored, const CXCursor& cur)
     {
+        auto loc = clang_getCursorLocation(cur);
+
+        CXString filename;
+        unsigned line;
+        clang_getPresumedLocation(loc, &filename, &line, nullptr);
+
         return source_location::make_entity(get_display_name(cur).c_str(),
-                                            cxstring(clang_getFileName(file)).c_str());
+                                            cxstring(filename).c_str(), line);
     }
 
     inline source_location make_location(const CXType& type)

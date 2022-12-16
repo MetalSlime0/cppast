@@ -23,6 +23,8 @@ namespace detail
         static bool fast_preprocessing(const libclang_compile_config& config);
 
         static bool remove_comments_in_macro(const libclang_compile_config& config);
+
+        static bool keepEntitiesInIncludes(const libclang_compile_config& config);
     };
 
     void for_each_file(const libclang_compilation_database& database, void* user_data,
@@ -150,6 +152,11 @@ public:
         remove_comments_in_macro_ = b;
     }
 
+    void KeepEntitiesInIncludes( bool b ) noexcept
+    {
+        keepEntitiesInIncludes = b;
+    }
+
 private:
     void do_set_flags(cpp_standard standard, compile_flags flags) override;
 
@@ -170,6 +177,7 @@ private:
     bool        write_preprocessed_ : 1;
     bool        fast_preprocessing_ : 1;
     bool        remove_comments_in_macro_ : 1;
+    bool        keepEntitiesInIncludes : 1;
 
     friend detail::libclang_compile_config_access;
 };

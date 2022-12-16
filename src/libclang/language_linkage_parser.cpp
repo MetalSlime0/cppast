@@ -28,11 +28,17 @@ std::unique_ptr<cpp_entity> detail::try_parse_cpp_language_linkage(const parse_c
 
     auto builder = cpp_language_linkage::builder(name.c_str());
     context.comments.match(builder.get(), cur);
-    detail::visit_children(cur, [&](const CXCursor& child) {
+
+    auto cb = [&](const CXCursor& child) {
         auto entity = parse_entity(context, &builder.get(), child);
         if (entity)
             builder.add_child(std::move(entity));
-    });
+    };
+
+    if ( context.keepEntitiesInIncludes )
+        detail::visit_children(cur, cb );
+    else
+        detail::visit_children_checkfile(cur, context.path, cb );
 
     return builder.finish();
 }

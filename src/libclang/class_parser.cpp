@@ -130,6 +130,12 @@ std::unique_ptr<cpp_entity> detail::parse_cpp_class(const detail::parse_context&
                          || !clang_Cursor_isNull(clang_getSpecializedCursorTemplate(cur)));
     auto is_friend    = clang_getCursorKind(parent_cur) == CXCursor_FriendDecl;
 
+    auto loc = clang_getCursorLocation( cur );
+    //CXString filename;
+    unsigned int line;
+    clang_getFileLocation( loc, NULL, &line, nullptr, nullptr ); // clang_getPresumedLocation
+    //const char* filenameStr = clang_getCString( filename );
+
     auto                                builder = make_class_builder(context, cur);
     type_safe::optional<cpp_entity_ref> semantic_parent;
     if (!is_friend)
